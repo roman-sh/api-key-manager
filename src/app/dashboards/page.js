@@ -9,6 +9,15 @@ export default function ApiKeysManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
+  const [deleteModal, setDeleteModal] = useState({ show: false, keyId: null, keyName: '' });
+
+  // Add this helper function at the top of your component
+  const obfuscateKey = (key) => {
+    const prefix = key.substring(0, 5);  // Show first 5 chars
+    const suffix = key.substring(key.length - 4);  // Show last 4 chars
+    const middle = '*'.repeat(8);  // Fixed length of asterisks
+    return `${prefix}${middle}${suffix}`;
+};
 
   // Inside your existing useEffect
   useEffect(() => {
@@ -76,34 +85,28 @@ export default function ApiKeysManager() {
 
   const createApiKey = async (e) => {
     e.preventDefault();
+    if (!newKeyName.trim()) {
+      toast.error('Please enter a key name');
+      return;
+    }
+
     try {
-      const newKey = `sk_${uuidv4()}`;
-      const { data, error } = await supabase
-        .from('api_keys')
-        .insert([
-          {
-            name: newKeyName,
-            key: newKey,
-            user_id: (await supabase.auth.getUser()).data.user.id
-          }
-        ])
-        .select()
-        .single();
+      const newKey = `sk-${uuidv4()}`;
+
+      const { error } = await supabase.from('api_keys').insert([
+        {
+          name: newKeyName.trim(),
+          key: newKey,
+          user_id: (await supabase.auth.getUser()).data.user.id,
+        },
+      ]);
 
       if (error) throw error;
 
       setNewKeyName('');
       setShowCreateForm(false);
       toast.success('API key created successfully');
-      
-      // Show the new key only once
-      toast(
-        <div className="text-sm">
-          <p className="font-medium mb-1">Save your API key - it won't be shown again!</p>
-          <code className="bg-gray-100 px-2 py-1 rounded">{newKey}</code>
-        </div>,
-        { duration: 10000 }
-      );
+
     } catch (error) {
       toast.error('Failed to create API key');
       console.error('Error:', error);
@@ -111,8 +114,6 @@ export default function ApiKeysManager() {
   };
 
   const deleteApiKey = async (id) => {
-    if (!confirm('Are you sure you want to delete this API key?')) return;
-
     try {
       const { error } = await supabase
         .from('api_keys')
@@ -121,9 +122,21 @@ export default function ApiKeysManager() {
 
       if (error) throw error;
       toast.success('API key deleted successfully');
+      setDeleteModal({ show: false, keyId: null, keyName: '' });
     } catch (error) {
       toast.error('Failed to delete API key');
       console.error('Error:', error);
+    }
+  };
+
+  // Add this function to handle copying
+  const copyToClipboard = async (text, keyName) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`Key "${keyName}" copied to clipboard`);
+    } catch (err) {
+      toast.error('Failed to copy key');
+      console.error('Failed to copy:', err);
     }
   };
 
@@ -210,13 +223,36 @@ export default function ApiKeysManager() {
                         >
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
                         </svg>
-                        <code className="text-gray-600 text-sm flex-1">{key.key}</code>
+                        <code className="text-gray-600 text-sm flex-1">{obfuscateKey(key.key)}</code>
+                        <button
+    onClick={() => copyToClipboard(key.key, key.name)}
+    className="p-1 hover:bg-gray-100 rounded-full inline-flex items-center"
+    title="Copy full API key"
+  >
+    <svg 
+      className="w-4 h-4 text-gray-500 hover:text-gray-700"
+      xmlns="http://www.w3.org/2000/svg" 
+      viewBox="0 0 24 24"
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>
+  </button>
                       </div>
                     </div>
                   </td>
                   <td className="p-4">
                     <button
-                      onClick={() => deleteApiKey(key.id)}
+                      onClick={() => setDeleteModal({ 
+                        show: true, 
+                        keyId: key.id,
+                        keyName: key.name 
+                      })}
                       className="bg-[#ef5350] text-white px-4 py-1.5 rounded-md hover:bg-[#e53935] transition-colors flex items-center gap-2"
                     >
                       <svg
@@ -242,6 +278,50 @@ export default function ApiKeysManager() {
           </tbody>
         </table>
       </div>
+
+      {deleteModal.show && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-50">
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <div className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                  </div>
+                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                    <h3 className="text-base font-semibold leading-6 text-gray-900">
+                      Delete API Key
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        Are you sure you want to delete the API key "{deleteModal.keyName}"? This action cannot be undone.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    className="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto"
+                    onClick={() => deleteApiKey(deleteModal.keyId)}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                    onClick={() => setDeleteModal({ show: false, keyId: null, keyName: '' })}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
