@@ -10,6 +10,10 @@ export default function ApiKeysManager() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [deleteModal, setDeleteModal] = useState({ show: false, keyId: null, keyName: '' });
+  const [userEmail, setUserEmail] = useState('');
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Add this helper function at the top of your component
   const obfuscateKey = (key) => {
@@ -22,48 +26,59 @@ export default function ApiKeysManager() {
   // Inside your existing useEffect
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = '/login';
-        return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          window.location.href = '/login';
+          return;
+        }
+
+        setIsAuthenticated(true);
+        setUserEmail(session.user.email);
+        
+        console.log('Setting up real-time subscription...');
+        
+        const channel = supabase
+          .channel('api_keys_channel')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'api_keys' },
+            (payload) => {
+              fetchApiKeys();
+            }
+          )
+          .subscribe((status) => {
+            console.log('Subscription status:', status);
+          });
+
+        console.log('Performing initial fetch...');
+        await fetchApiKeys();
+
+        return () => {
+          console.log('Cleaning up subscription...');
+          supabase.removeChannel(channel);
+        };
+      } finally {
+        setIsAuthChecking(false);
       }
-      
-      console.log('Setting up real-time subscription...');
-      
-      // Add subscription after confirming auth
-      const channel = supabase
-        .channel('api_keys_channel')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'api_keys',
-          },
-          (payload) => {
-            // console.log('Change received:', payload);
-            // console.log('Payload type:', payload.eventType); // INSERT, UPDATE, or DELETE
-            // console.log('Changed record:', payload.new || payload.old);
-            fetchApiKeys();
-          }
-        )
-        .subscribe((status) => {
-          console.log('Subscription status:', status);
-        });
-
-      // Initial fetch
-      console.log('Performing initial fetch...');
-      await fetchApiKeys();
-
-      // Cleanup subscription
-      return () => {
-        console.log('Cleaning up subscription...');
-        supabase.removeChannel(channel);
-      };
     };
     
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showUserMenu && !event.target.closest('.relative')) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu]);
 
   const fetchApiKeys = async () => {
     try {
@@ -140,17 +155,84 @@ export default function ApiKeysManager() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      console.log('Signing out...');
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Failed to log out');
+    }
+  };
+
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#9575cd] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-6">
       <Toaster position="bottom-right" />
       
       {/* Header with New API Key button */}
-      <button
-        onClick={() => setShowCreateForm(true)}
-        className="mb-6 bg-[#9575cd] text-white px-4 py-2 rounded-md hover:bg-[#7e57c2] transition-colors flex items-center gap-2"
-      >
-        <span className="text-xl">+</span> New API key
-      </button>
+      <div className="flex justify-between items-center mb-6">
+        <button
+          onClick={() => setShowCreateForm(true)}
+          className="bg-[#9575cd] text-white px-4 py-2 rounded-md hover:bg-[#7e57c2] transition-colors flex items-center gap-2"
+        >
+          <span className="text-xl">+</span> New API key
+        </button>
+
+        <div className="relative">
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
+          >
+            <div className="w-8 h-8 bg-[#9575cd] rounded-full flex items-center justify-center text-white">
+              {userEmail.charAt(0).toUpperCase()}
+            </div>
+          </button>
+
+          {showUserMenu && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border">
+              <div className="px-4 py-2 text-sm text-gray-700 border-b">
+                {userEmail}
+              </div>
+              <div
+                onClick={handleLogout}
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer flex items-center gap-2"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+                Sign out
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Create API Key Form Modal */}
       {showCreateForm && (
