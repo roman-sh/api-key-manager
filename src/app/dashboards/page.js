@@ -14,6 +14,8 @@ export default function ApiKeysManager() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [editingKey, setEditingKey] = useState(null);
+  const [editingName, setEditingName] = useState('');
 
   // Add this helper function at the top of your component
   const obfuscateKey = (key) => {
@@ -167,6 +169,32 @@ export default function ApiKeysManager() {
     }
   };
 
+  const handleEditName = async (keyId, newName) => {
+    try {
+      if (!newName.trim()) {
+        toast.error('Key name cannot be empty');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('api_keys')
+        .update({ name: newName.trim() })
+        .eq('id', keyId);
+
+      if (error) throw error;
+
+      setEditingKey(null);
+      setEditingName('');
+      toast.success('API key name updated');
+      
+      // Refresh the keys list
+      await fetchApiKeys();
+      
+    } catch (error) {
+      toast.error('Failed to update key name');
+    }
+  };
+
   if (isAuthChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -292,7 +320,57 @@ export default function ApiKeysManager() {
             ) : (
               apiKeys.map((key) => (
                 <tr key={key.id} className="border-b last:border-b-0">
-                  <td className="p-4 text-gray-700">{key.name}</td>
+                  <td className="p-4 text-gray-700">
+                    {editingKey === key.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          className="flex-1 px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#9575cd] focus:border-transparent"
+                          placeholder="Enter key name"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleEditName(key.id, editingName)}
+                          className="p-1 text-green-600 hover:text-green-700"
+                          title="Save"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingKey(null);
+                            setEditingName('');
+                          }}
+                          className="p-1 text-gray-600 hover:text-gray-700"
+                          title="Cancel"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingKey(key.id);
+                            setEditingName(key.name);
+                          }}
+                          className="p-1 text-gray-400 hover:text-gray-600"
+                          title="Edit name"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                        <span>{key.name}</span>
+                      </div>
+                    )}
+                  </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
                       <div className="bg-gray-100 px-3 py-2 rounded flex items-center gap-2 flex-1">
