@@ -10,7 +10,7 @@ export default function UserMenu({ userEmail, onLogout }) {
         onClick={() => setShowMenu(!showMenu)}
         className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
       >
-        <div className="w-12 h-12 bg-[#9575cd] rounded-full flex items-center justify-center text-white">
+        <div className="w-12 h-12 bg-[#9575cd] hover:bg-[#7e57c2] transition-colors rounded-full flex items-center justify-center text-white">
           <svg 
             className="w-6 h-6" 
             fill="currentColor" 
