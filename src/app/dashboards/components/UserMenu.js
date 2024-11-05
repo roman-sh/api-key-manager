@@ -10,8 +10,19 @@ export default function UserMenu({ userEmail, onLogout }) {
         onClick={() => setShowMenu(!showMenu)}
         className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
       >
-        <div className="w-8 h-8 bg-[#9575cd] rounded-full flex items-center justify-center text-white">
-          {userEmail.charAt(0).toUpperCase()}
+        <div className="w-12 h-12 bg-[#9575cd] rounded-full flex items-center justify-center text-white">
+          <svg 
+            className="w-6 h-6" 
+            fill="currentColor" 
+            viewBox="0 0 24 24" 
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path 
+              fillRule="evenodd" 
+              d="M12 4a4 4 0 100 8 4 4 0 000-8zM6 8a6 6 0 1112 0A6 6 0 016 8zm2 10a3 3 0 00-3 3 1 1 0 11-2 0 5 5 0 015-5h8a5 5 0 015 5 1 1 0 11-2 0 3 3 0 00-3-3H8z" 
+              clipRule="evenodd"
+            />
+          </svg>
         </div>
       </button>
 
