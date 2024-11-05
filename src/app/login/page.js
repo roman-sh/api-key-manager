@@ -40,8 +40,9 @@ export default function LoginPage() {
             src="/chamomile-logo.png"
             alt="Chamomile Logo"
             fill
-            priority
+            sizes="96px"
             className="object-contain"
+            quality={85}
           />
         </div>
         <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
